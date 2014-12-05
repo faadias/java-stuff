@@ -64,13 +64,12 @@ public class ExtendedDateFormat {
 	
 	
 	public ExtendedDateFormat(String pattern, Locale locale) {
-		this.pattern = pattern == null ? "" : pattern;
 		this.locale = locale == null ? Locale.getDefault() : locale;
 		this.tokens = new ArrayList<FormatToken>();
 		this.cal = (GregorianCalendar) Calendar.getInstance();
 		this.dfs = DateFormatSymbols.getInstance(locale);
 		
-		lexAnalyzer();
+		applyPattern(pattern);
 	}
 	
 	public ExtendedDateFormat(String pattern) {
@@ -158,9 +157,9 @@ public class ExtendedDateFormat {
 			case 'X':
 				return getISO8601TimeZone(length);
 			case 'o':
-				return getOrderString(cal.get(Calendar.DAY_OF_MONTH));
+				return getDayOrdinal(cal.get(Calendar.DAY_OF_MONTH));
 			case 'O':
-				return getOrderString(cal.get(Calendar.DAY_OF_YEAR));
+				return getDayOrdinal(cal.get(Calendar.DAY_OF_YEAR));
 			default:
 				throw new IllegalArgumentException ("Illegal pattern character " + c);
 		}
@@ -197,7 +196,7 @@ public class ExtendedDateFormat {
 		}
 	}
 	
-	protected String getOrderString(int day) {
+	protected final String getDayOrdinal(int day) {
 		switch(day % 10) {
 		case 1:
 			return (day % 100) != 1 ? "st" : "th";
@@ -210,6 +209,21 @@ public class ExtendedDateFormat {
 		}
 	}
 	
+	protected void applyPattern(String pattern) {
+		if (pattern == null) {
+			throw new NullPointerException("Pattern cannot be null");
+		}
+		
+		int numberOfSingleQuotes = pattern.length() - pattern.replace("'", "").length();
+		
+		if (numberOfSingleQuotes % 2 != 0) {
+			throw new IllegalArgumentException("Unterminated quote");
+		}
+		
+		this.pattern = pattern;
+		lexAnalyzer();
+	}
+	
 	protected void lexAnalyzer() {
 		boolean quoteOpened = false;
 		Character lastFormatterChar = null;
@@ -220,7 +234,13 @@ public class ExtendedDateFormat {
 			
 			if (c == SINGLE_QUOTE) {
 				if (i+1 < pattern.length() && pattern.charAt(i+1) == SINGLE_QUOTE) {
-					token.content += c;
+					
+					if (token.type == FormatType.FORMATTER) {
+						tokens.add(token);
+						token = new FormatToken();
+						token.type = FormatType.SEPARATOR;
+					}
+					
 					i++;
 				}
 				else {
@@ -231,6 +251,8 @@ public class ExtendedDateFormat {
 						token.type = FormatType.TEXT;
 					}
 				}
+				
+				token.content += c;
 			}
 			else {
 				if (quoteOpened) {
