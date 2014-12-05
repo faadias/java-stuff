@@ -26,7 +26,6 @@ import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
-import java.util.regex.Pattern;
 
 /**
  * 
@@ -44,7 +43,6 @@ import java.util.regex.Pattern;
 public class ExtendedDateFormat {
 	
 	protected static final char SINGLE_QUOTE = '\'';
-	protected static final Pattern formatterPattern = Pattern.compile("[A-Za-z]");
 	
 	protected String pattern = null;
 	protected Locale locale = null;
