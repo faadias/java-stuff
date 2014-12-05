@@ -239,7 +239,7 @@ public class ExtendedDateFormat {
 					token.content += c;
 				}
 				else {
-					if ( (c >= 65 && c <= 90) || (c >= 97 && c <= 122)) { //c in range [A,Z] union [a-z]
+					if ( (c >= 65 && c <= 90) || (c >= 97 && c <= 122)) { //c in range [A-Z] U [a-z]
 						if (token.type == null) {
 							token.type = FormatType.FORMATTER;
 						}
