@@ -198,11 +198,11 @@ public class ExtendedDateFormat {
 	protected final String getDayOrdinal(int day) {
 		switch(day % 10) {
 		case 1:
-			return (day % 100) != 1 ? "st" : "th";
+			return ((day/10) % 10) != 1 ? "st" : "th";
 		case 2:
-			return (day % 100) != 1 ? "nd" : "th";
+			return ((day/10) % 10) != 1 ? "nd" : "th";
 		case 3:
-			return (day % 100) != 1 ? "rd" : "th";
+			return ((day/10) % 10) != 1 ? "rd" : "th";
 		default:
 			return "th";
 		}
