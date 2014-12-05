@@ -65,7 +65,6 @@ public class ExtendedDateFormat {
 	
 	public ExtendedDateFormat(String pattern, Locale locale) {
 		this.locale = locale == null ? Locale.getDefault() : locale;
-		this.tokens = new ArrayList<FormatToken>();
 		this.cal = (GregorianCalendar) Calendar.getInstance();
 		this.dfs = DateFormatSymbols.getInstance(locale);
 		
@@ -225,6 +224,8 @@ public class ExtendedDateFormat {
 	}
 	
 	protected void lexAnalyzer() {
+		this.tokens = new ArrayList<FormatToken>();
+		
 		boolean quoteOpened = false;
 		Character lastFormatterChar = null;
 		FormatToken token = new FormatToken();
