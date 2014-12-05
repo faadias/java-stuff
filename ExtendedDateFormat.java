@@ -1,3 +1,5 @@
+/* https://github.com/faadias/java-stuff/blob/master/ExtendedDateFormat.java */
+
 /* ExtendedDateFormat.java -- A class for formatting dates
  * Copyright (C) 2014  Felipe Augusto Araujo Dias (@faadias1)
  * 
@@ -17,7 +19,14 @@
  */
 
 import java.text.DateFormatSymbols;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
+import java.util.regex.Pattern;
 
 /**
  * 
@@ -35,15 +44,7 @@ import java.util.*;
 public class ExtendedDateFormat {
 	
 	protected static final char SINGLE_QUOTE = '\'';
-	protected static final Set<Character> formatters = new HashSet<Character>(
-		Arrays.asList(
-			/*  'o' is the ordinal for day of month
-			 *  'O' is the ordinal for day of year
-			 *  all other chars are documented within JAVA's SimpleDateFormat class
-			 */
-			new Character[] {'G','y','Y','M','w','W','D','d','F','E','a','h','H','k','K','m','s','S','z','Z','o','O'}
-		)
-	);
+	protected static final Pattern formatterPattern = Pattern.compile("[A-Za-z]");
 	
 	protected String pattern = null;
 	protected Locale locale = null;
@@ -98,23 +99,25 @@ public class ExtendedDateFormat {
 		}
 		
 		if (token.type == FormatType.TEXT) {
-			return token.content.replaceAll("^'|'$", "").replaceAll("''","'");
+			return token.content.replaceAll("^'|'$", "");
 		}
 		
 		//token.type == FormatType.FORMATTER
 		char c = token.content.charAt(0);
 		int length = token.content.length();
-		String format = c == 'Z' ? "%04d" : "%0" + length + "d";
+		String format = "%0" + length + "d";
 		
 		switch (c) {
 			case 'G':
 				return dfs.getEras()[cal.get(Calendar.ERA)];
 			case 'y':
-			case 'Y':
-				if (length == 2) return String.valueOf(cal.get(Calendar.YEAR) % 100);
+				if (length == 2) return String.format(format, cal.get(Calendar.YEAR) % 100);
 				return String.format(format, cal.get(Calendar.YEAR));
+			case 'Y':
+				if (length == 2) return String.format(format, cal.getWeekYear() % 100);
+				return String.format(format, cal.getWeekYear());
 			case 'M':
-				if (length < 3) return String.valueOf(cal.get(Calendar.MONTH)+1);
+				if (length < 3) return String.format(format, cal.get(Calendar.MONTH)+1);
 				if (length > 3) return dfs.getMonths()[cal.get(Calendar.MONTH)];
 				return dfs.getShortMonths()[cal.get(Calendar.MONTH)];
 			case 'w':
@@ -130,6 +133,8 @@ public class ExtendedDateFormat {
 			case 'E':
 				if (length > 3) return dfs.getWeekdays()[cal.get(Calendar.DAY_OF_WEEK)];
 				return dfs.getShortWeekdays()[cal.get(Calendar.DAY_OF_WEEK)];
+			case 'u':
+				return String.format(format, cal.get(Calendar.DAY_OF_WEEK) == 1 ? 7 : cal.get(Calendar.DAY_OF_WEEK)-1);
 			case 'a':
 				return dfs.getAmPmStrings()[cal.get(Calendar.AM_PM)];
 			case 'h':
@@ -151,20 +156,46 @@ public class ExtendedDateFormat {
 				boolean isDST = cal.get(Calendar.DST_OFFSET) != 0;
 				return tz.getDisplayName(isDST, length < 4 ? TimeZone.SHORT : TimeZone.LONG, locale);
 			case 'Z':
-				int pureMinutes = (cal.get(Calendar.ZONE_OFFSET) + cal.get(Calendar.DST_OFFSET)) / 60000;
-				pureMinutes = Math.abs(pureMinutes);
-				
-				char sign = pureMinutes < 0 ? '-' : '+';
-				int hours = pureMinutes / 60;
-				int minutes = pureMinutes % 60;
-				String text = sign + String.format(format, hours * 100 + minutes);
-				return text;
+				return getRFC822TimeZone();
+			case 'X':
+				return getISO8601TimeZone(length);
 			case 'o':
 				return getOrderString(cal.get(Calendar.DAY_OF_MONTH));
 			case 'O':
 				return getOrderString(cal.get(Calendar.DAY_OF_YEAR));
 			default:
 				throw new IllegalArgumentException ("Illegal pattern character " + c);
+		}
+	}
+	
+	protected final String getRFC822TimeZone() {
+		int pureMinutes = (cal.get(Calendar.ZONE_OFFSET) + cal.get(Calendar.DST_OFFSET)) / 60000;
+		char sign = pureMinutes < 0 ? '-' : '+';
+		pureMinutes = Math.abs(pureMinutes);
+		
+		int hours = pureMinutes / 60;
+		int minutes = pureMinutes % 60;
+		
+		return sign + String.format("%04d", hours * 100 + minutes);
+	}
+	
+	protected final String getISO8601TimeZone(int length) {
+		int pureMinutes = (cal.get(Calendar.ZONE_OFFSET) + cal.get(Calendar.DST_OFFSET)) / 60000;
+		char sign = pureMinutes < 0 ? '-' : '+';
+		pureMinutes = Math.abs(pureMinutes);
+		
+		int hours = pureMinutes / 60;
+		int minutes = pureMinutes % 60;
+		
+		switch(length) {
+		case 1:
+			return sign + String.format("%02d", hours);
+		case 2:
+			return sign + String.format("%02d", hours) + String.format("%02d", minutes);
+		case 3:
+			return sign + String.format("%02d", hours) + ":" + String.format("%02d", minutes);
+		default:
+			throw new IllegalArgumentException ("Invalid ISO 8601 format: length=" + length);
 		}
 	}
 	
@@ -189,60 +220,53 @@ public class ExtendedDateFormat {
 		for (int i = 0; i < pattern.length(); i++) {
 			char c = pattern.charAt(i);
 			
-			if (quoteOpened) {
-				if (c == SINGLE_QUOTE) {
+			if (c == SINGLE_QUOTE) {
+				if (i+1 < pattern.length() && pattern.charAt(i+1) == SINGLE_QUOTE) {
 					token.content += c;
-					if (i+1 < pattern.length() && pattern.charAt(i+1) == SINGLE_QUOTE) {
-						token.content += SINGLE_QUOTE;
-						i++;
-					}
-					else {
-						quoteOpened = false;
-					}
+					i++;
 				}
 				else {
-					token.content += c;
-				}
-			}
-			else {
-				if (formatters.contains(c)) {
-					if (token.type == null) {
-						token.type = FormatType.FORMATTER;
-					}
-					
-					if (token.type != FormatType.FORMATTER || ( !"".equals(token.content) && c != lastFormatterChar )) {
-						tokens.add(token);
-						token = new FormatToken();
-						token.type = FormatType.FORMATTER;
-					}
-
-					token.content += c;
-					lastFormatterChar = c;
-				}
-				else if (c == SINGLE_QUOTE) {
-					quoteOpened = true;
-					
-					if (token.type != FormatType.TEXT) {
+					quoteOpened = !quoteOpened;
+					if (quoteOpened) {
 						tokens.add(token);
 						token = new FormatToken();
 						token.type = FormatType.TEXT;
 					}
+				}
+			}
+			else {
+				if (quoteOpened) {
 					token.content += c;
-					lastFormatterChar = null;
 				}
 				else {
-					if (token.type == null) {
-						token.type = FormatType.SEPARATOR;
+					if ( (c >= 65 && c <= 90) || (c >= 97 && c <= 122)) { //c in range [A,Z] union [a-z]
+						if (token.type == null) {
+							token.type = FormatType.FORMATTER;
+						}
+						
+						if (token.type != FormatType.FORMATTER || ( !"".equals(token.content) && c != lastFormatterChar )) {
+							tokens.add(token);
+							token = new FormatToken();
+							token.type = FormatType.FORMATTER;
+						}
+
+						token.content += c;
+						lastFormatterChar = c;
 					}
-					
-					if (token.type != FormatType.SEPARATOR) {
-						tokens.add(token);
-						token = new FormatToken();
-						token.type = FormatType.SEPARATOR;
+					else {
+						if (token.type == null) {
+							token.type = FormatType.SEPARATOR;
+						}
+						
+						if (token.type != FormatType.SEPARATOR) {
+							tokens.add(token);
+							token = new FormatToken();
+							token.type = FormatType.SEPARATOR;
+						}
+						
+						token.content += c;
+						lastFormatterChar = null;
 					}
-					
-					token.content += c;
-					lastFormatterChar = null;
 				}
 			}
 		}
