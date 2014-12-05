@@ -1,4 +1,4 @@
 java-stuff
 ==========
 
-A repository of tools made in JAVA,
+A repository of tools made in JAVA.
